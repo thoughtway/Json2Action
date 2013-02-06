@@ -23,7 +23,7 @@ public class command {
 	 */
 	public static void main(String[] args) throws MalformedURLException {
 		// TODO Auto-generated method stub
-		String 	inputdir = "/home/netbsd/workspace/Json2Action/example/input", 
+		String 	inputdir = "/Users/xiehuajun/Documents/workspace/Json2Action/example/input", 
 				outputdir = "/home/netbsd/workspace/Json2Action/example/output";
 		
 		File[] list = new File(inputdir).listFiles();
