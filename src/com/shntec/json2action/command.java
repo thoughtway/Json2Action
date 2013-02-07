@@ -23,9 +23,11 @@ public class command {
 	 */
 	public static void main(String[] args) throws MalformedURLException {
 		// TODO Auto-generated method stub
-		String 	inputdir = "/Users/xiehuajun/Documents/workspace/Json2Action/example/input", 
-				outputdir = "/home/netbsd/workspace/Json2Action/example/output";
-		
+		String ParentPath = new File(command.class.getResource("/").getPath()).getParent();
+//		String 	inputdir = "/Users/xiehuajun/Documents/workspace/Json2Action/example/input", 
+//				outputdir = "/home/netbsd/workspace/Json2Action/example/output";
+		String 	inputdir = ParentPath + "/example/input", 
+				outputdir = ParentPath + "/example/output";
 		File[] list = new File(inputdir).listFiles();
 
 		for (int i = 0; i < list.length; i++)
