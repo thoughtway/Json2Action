@@ -2,6 +2,7 @@ package com.shntec.json2action;
 
 import java.lang.reflect.Modifier;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -17,14 +18,19 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.NullSerializer;
+import com.googlecode.jsonschema2pojo.exception.GenerationException;
+import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
 import com.sun.codemodel.JClass;
 import com.sun.codemodel.JClassAlreadyExistsException;
 import com.sun.codemodel.JClassContainer;
 import com.sun.codemodel.JCodeModel;
 import com.sun.codemodel.JDefinedClass;
+import com.sun.codemodel.JEnumConstant;
 import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JFieldVar;
+import com.sun.codemodel.JForEach;
+import com.sun.codemodel.JInvocation;
 import com.sun.codemodel.JMethod;
 import com.sun.codemodel.JMod;
 import com.sun.codemodel.JPackage;
@@ -33,6 +39,7 @@ import com.sun.codemodel.JType;
 import com.sun.codemodel.JVar;
 
 import static java.lang.Character.*;
+import static java.util.Arrays.asList;
 import static org.apache.commons.lang.StringUtils.*;
 import static javax.lang.model.SourceVersion.*;
 
@@ -111,7 +118,7 @@ public class Generator {
 		{
 			System.out.println("no ref");
 			if (schemaNode.has("enum")) {
-				
+				javaType = enumProccess(nodeName, schemaNode, generatableType, schema);
 			}
 			else
 			{
@@ -133,7 +140,6 @@ public class Generator {
         if (node.has("type")) {
             typename = node.get("type").asText();
         }
-
         System.out.println(typename);
         
         if (typename.equals("string")) {
@@ -170,6 +176,17 @@ public class Generator {
         	type = jClassContainer.owner().ref(Object.class);
         }
 		return type;
+	};
+	
+	private JDefinedClass enumProccess(String nodeName, JsonNode node, JClassContainer jContainer, Schema schema){
+		JDefinedClass _enum = this.createEnum(nodeName, jContainer);
+		schema.setJavaTypeIfEmpty(_enum);
+		
+		JFieldVar valueField = addValueField(_enum);
+		addToString(_enum, valueField);
+        addEnumConstants(node, _enum);
+        addFactoryMethod(node, _enum);
+		return _enum;
 	};
 	
 	private JClass arrayProcess(String nodeName, JsonNode node, JPackage jpackage, Schema schema) throws JClassAlreadyExistsException {
@@ -352,5 +369,77 @@ public class Generator {
         }
 
     }
+    
+    private JDefinedClass createEnum(String nodeName, JClassContainer container){
+    	int modifiers = container.isPackage() ? JMod.PUBLIC : JMod.PUBLIC | JMod.STATIC;
+
+        String name = nodeName;
+        
+        try {
+            return container._class(modifiers, name, ClassType.ENUM);
+        } catch (JClassAlreadyExistsException e) {
+            throw new GenerationException(e);
+        }
+    }
    
+    private JFieldVar addValueField(JDefinedClass _enum){
+    	JFieldVar valueField = _enum.field(JMod.PRIVATE | JMod.FINAL, String.class, "value");
+
+        JMethod constructor = _enum.constructor(JMod.PRIVATE);
+        JVar valueParam = constructor.param(String.class, "value");
+        JBlock body = constructor.body();
+        body.assign(JExpr._this().ref(valueField), valueParam);
+    	return valueField;
+    }
+    
+    private void addToString(JDefinedClass _enum, JFieldVar valueField){
+    	JMethod toString = _enum.method(JMod.PUBLIC, String.class, "toString");
+        JBlock body = toString.body();
+
+        body._return(JExpr._this().ref(valueField));
+    };
+    
+    private void addEnumConstants(JsonNode node, JDefinedClass _enum) {
+        for (Iterator<JsonNode> values = node.elements(); values.hasNext();) {
+            JsonNode value = values.next();
+
+            if (!value.isNull()) {
+                JEnumConstant constant = _enum.enumConstant(getConstantName(value.asText()));
+                constant.arg(JExpr.lit(value.asText()));
+            }
+        }
+    };
+    
+    private String getConstantName(String nodeName) {
+    	List<String> enumNameGroups = new ArrayList<String>(asList(splitByCharacterTypeCamelCase(nodeName)));
+
+        String enumName = "";
+
+        enumName = upperCase(join(enumNameGroups, "_"));
+
+        if (isEmpty(enumName)) {
+            enumName = "__EMPTY__";
+        } else if (Character.isDigit(enumName.charAt(0))) {
+            enumName = "_" + enumName;
+        }
+        
+        return enumName;
+    };
+    
+    private void addFactoryMethod(JsonNode node, JDefinedClass _enum) {
+        JMethod fromValue = _enum.method(JMod.PUBLIC | JMod.STATIC, _enum, "fromValue");
+        JVar valueParam = fromValue.param(String.class, "value");
+        JBlock body = fromValue.body();
+
+        JForEach forEach = body.forEach(_enum, "c", _enum.staticInvoke("values"));
+
+        JInvocation invokeEquals = forEach.var().ref("value").invoke("equals");
+        invokeEquals.arg(valueParam);
+
+        forEach.body()._if(invokeEquals)._then()._return(forEach.var());
+
+        JInvocation illegalArgumentException = JExpr._new(_enum.owner().ref(IllegalArgumentException.class));
+        illegalArgumentException.arg(valueParam);
+        body._throw(illegalArgumentException);
+    }
 }
