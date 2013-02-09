@@ -166,6 +166,10 @@ public class Generator {
         	else
         	{
         		type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
+        		JFieldVar schemaField = ((JDefinedClass)type).field(JMod.PRIVATE|JMod.STATIC, jClassContainer.owner().ref(String.class), "JSONSCHEMA");
+        		System.out.println(node.toString());
+        		schemaField.init(JExpr.lit(node.toString()));
+        		createConstructor((JDefinedClass)type, node);
         	}
         }
         else if (typename.equals("array")){
@@ -177,6 +181,11 @@ public class Generator {
         }
 		return type;
 	};
+	
+	private void createConstructor(JDefinedClass jClass, JsonNode node){
+		JMethod constructor = jClass.constructor(JMod.PUBLIC);
+		constructor.param(jClass.owner().ref("String"), "RequestJson");
+	}
 	
 	private JDefinedClass enumProccess(String nodeName, JsonNode node, JClassContainer jContainer, Schema schema){
 		JDefinedClass _enum = this.createEnum(nodeName, jContainer);
