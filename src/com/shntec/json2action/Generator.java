@@ -1,10 +1,13 @@
 package com.shntec.json2action;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -167,9 +170,9 @@ public class Generator {
         	{
         		type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
         		JFieldVar schemaField = ((JDefinedClass)type).field(JMod.PRIVATE|JMod.STATIC, jClassContainer.owner().ref(String.class), "JSONSCHEMA");
-        		System.out.println(node.toString());
         		schemaField.init(JExpr.lit(node.toString()));
         		createConstructor((JDefinedClass)type, node);
+        		createDoAction((JDefinedClass)type);
         	}
         }
         else if (typename.equals("array")){
@@ -182,9 +185,78 @@ public class Generator {
 		return type;
 	};
 	
+	private void createDoAction(JDefinedClass jClass){
+		Map m = jClass.fields();
+		Iterator it = m.entrySet().iterator();
+		boolean hasResponse = false;
+		
+		while(it.hasNext())
+		{
+			Map.Entry entry = (Map.Entry) it.next();
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == "Response")
+            {
+            	hasResponse = true;
+            	break;
+            }
+		};
+		JMethod doFunction = null;
+		if (!hasResponse)
+			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().VOID, "doAction");
+		else
+			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("Response"), "doAction");
+		
+		
+	};
+	
 	private void createConstructor(JDefinedClass jClass, JsonNode node){
 		JMethod constructor = jClass.constructor(JMod.PUBLIC);
-		constructor.param(jClass.owner().ref("String"), "RequestJson");
+		JBlock jBlock = constructor.body();
+		jBlock.directStatement("Action = new Action();");
+		jBlock.directStatement("Parameter = new Parameter();");
+		
+		ObjectMapper O_MAPPER = new ObjectMapper();
+		JsonNode root = null;
+		try {
+			root = O_MAPPER.readTree(new File(this.url.toURI()));
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return;
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return;
+		}
+		
+		if (root.has("Action"))
+		{
+			JsonNode anode = root.get("Action");
+			System.out.println(node);
+			//jBlock.directStatement("Action.")
+			Iterator it = anode.fields();
+			
+			while(it.hasNext()){
+				Map.Entry entry = (Map.Entry) it.next();
+				String key = (String)entry.getKey();
+		        JsonNode value = (JsonNode)entry.getValue();
+		        if ("string".equalsIgnoreCase(node.get("properties").get("Action").get("properties").get(key).get("type").asText()))
+		        {
+		        	jBlock.directStatement("Action.set" + key + "(\"" + value.asText() + "\");");
+		        }
+		        else
+		        {
+		        	jBlock.directStatement("Action.set" + key + "(" + value.asText() + ");");
+		        }
+		        
+			}
+		}
+		//constructor.param(jClass.owner().ref("String"), "RequestJson");
 	}
 	
 	private JDefinedClass enumProccess(String nodeName, JsonNode node, JClassContainer jContainer, Schema schema){
