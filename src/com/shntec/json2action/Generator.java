@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -93,14 +94,24 @@ public class Generator {
 		this.classname = classname;
 	};
 	
+	public void generate(JCodeModel codeModel) throws JClassAlreadyExistsException{
+		if (null != this.url)
+		{
+			ObjectNode schemaNode = parser.parse(this.url);
+			Schema schema = new Schema(null, schemaNode);
+			
+			JPackage jpackage = codeModel._package(this.packagename);
+			
+			_generator(this.classname, schemaNode, jpackage, schema);
+		}
+	};
+	
 	public JCodeModel generate() throws JClassAlreadyExistsException{
 		if (null != this.url)
 		{
 			JCodeModel codeModel = new JCodeModel();
 			ObjectNode schemaNode = parser.parse(this.url);
 			Schema schema = new Schema(null, schemaNode);
-			
-			System.out.println(schemaNode);
 			
 			JPackage jpackage = codeModel._package(this.packagename);
 
@@ -165,6 +176,11 @@ public class Generator {
         		//type = jClassContainer._class(Modifier.PUBLIC, nodeName);
         		type = jClassContainer._class(Modifier.PUBLIC, nodeName);
         		propertiesProccess(nodeName, node.get("properties"), (JDefinedClass)type, currentSchema);
+        		if ("Response" == nodeName)
+        		{
+        			((JDefinedClass)type)._implements(jClassContainer.owner().ref("ResponseBase"));
+        			createToJson((JDefinedClass)type);
+        		}
         		//type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
         	}
         	else
@@ -185,6 +201,14 @@ public class Generator {
         	type = jClassContainer.owner().ref(Object.class);
         }
 		return type;
+	};
+	
+	private void createToJson(JDefinedClass jClass){
+		//Map m = jClass.fields();
+		//Iterator it = m.entrySet().iterator();
+		//ObjectMapper mapper = new ObjectMapper();
+		JMethod toJsonFunc = jClass.method(JMod.PUBLIC, String.class, "ToJson");
+		toJsonFunc.body().directStatement("");
 	};
 	
 	private void createValidate(JDefinedClass jClass){
@@ -241,7 +265,7 @@ public class Generator {
 			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().VOID, "doAction");
 		else
 		{
-			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("Response"), "doAction");
+			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("ResponseBase"), "doAction");
 			doFunction.body()._return(JExpr._null());
 		}
 	};
