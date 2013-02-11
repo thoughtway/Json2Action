@@ -47,6 +47,7 @@ import static org.apache.commons.lang.StringUtils.*;
 import static javax.lang.model.SourceVersion.*;
 
 import org.apache.commons.lang.WordUtils;
+import org.eel.kitchen.jsonschema.report.ValidationReport;
 
 public class Generator {
 	public class ClassAlreadyExistsException extends Exception {
@@ -173,6 +174,7 @@ public class Generator {
         		schemaField.init(JExpr.lit(node.toString()));
         		createConstructor((JDefinedClass)type, node);
         		createDoAction((JDefinedClass)type);
+        		createValidate((JDefinedClass)type);
         	}
         }
         else if (typename.equals("array")){
@@ -183,6 +185,39 @@ public class Generator {
         	type = jClassContainer.owner().ref(Object.class);
         }
 		return type;
+	};
+	
+	private void createValidate(JDefinedClass jClass){
+		JMethod validatefunc = jClass.method(JMod.PRIVATE, ValidationReport.class, "validate");
+		validatefunc._throws(IOException.class);
+		
+		JBlock jBlock = validatefunc.body();
+		validatefunc.param(String.class, "rawdata");
+		//ObjectMapper objectmap = new ObjectMapper();
+		JClass jClass_varomImpl = jClass.owner().ref(ObjectMapper.class);
+		JVar jvaromImpl = jBlock.decl(jClass_varomImpl, "objectmap");
+		jvaromImpl.init(JExpr._new(jClass_varomImpl));
+
+		//JsonNode schema = objectmap.readTree(JSONSCHEMA);
+		JClass jClass_varschemanodeImpl = jClass.owner().ref(JsonNode.class);
+		JVar jvarschemanodeImpl = jBlock.decl(jClass_varschemanodeImpl, "schemanode");
+		jvarschemanodeImpl.init(JExpr.direct("objectmap.readTree(JSONSCHEMA)"));
+
+		//JsonSchemaFactory factory = JsonSchemaFactory.defaultFactory();
+		JClass jClass_varfactoryImpl = jClass.owner().ref("org.eel.kitchen.jsonschema.main.JsonSchemaFactory");
+		JVar jvarfactoryImpl = jBlock.decl(jClass_varfactoryImpl, "factory");
+		jvarfactoryImpl.init(JExpr.direct("JsonSchemaFactory.defaultFactory()"));
+		
+		//JsonSchema schema = factory.fromSchema(fstabSchema);
+		JClass jClass_varschemaImpl = jClass.owner().ref("org.eel.kitchen.jsonschema.main.JsonSchema");
+		JVar jvarschemaImpl = jBlock.decl(jClass_varschemaImpl, "schema");
+		jvarschemaImpl.init(JExpr.direct("factory.fromSchema(schemanode)"));
+		//JsonNode request = objectmap.readTree(rawdata)
+		JClass jClass_varrequestImpl = jClass.owner().ref(JsonNode.class);
+		JVar jvarrequestImpl = jBlock.decl(jClass_varrequestImpl, "request");
+		jvarrequestImpl.init(JExpr.direct("objectmap.readTree(rawdata)"));
+		//return schema.validate(request).isSucces();
+		jBlock._return(JExpr.direct("schema.validate(request)"));
 	};
 	
 	private void createDoAction(JDefinedClass jClass){
@@ -205,9 +240,10 @@ public class Generator {
 		if (!hasResponse)
 			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().VOID, "doAction");
 		else
+		{
 			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("Response"), "doAction");
-		
-		
+			doFunction.body()._return(JExpr._null());
+		}
 	};
 	
 	private void createConstructor(JDefinedClass jClass, JsonNode node){
@@ -335,11 +371,11 @@ public class Generator {
         schema.setJavaTypeIfEmpty(jclass);
         
         if (node.has("title")) {
-//            ruleFactory.getTitleRule().apply(nodeName, node.get("title"), jclass, schema);
+
         }
 
         if (node.has("description")) {
-//            ruleFactory.getDescriptionRule().apply(nodeName, node.get("description"), jclass, schema);
+
         }
 
         if (node.has("properties")) {

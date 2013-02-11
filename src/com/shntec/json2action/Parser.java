@@ -97,6 +97,7 @@ public class Parser {
             properties.put(property, schemaFromJson(jsonObject.get(property)));
         }
         schema.put("properties", properties);
+        schema.put("required", true);
 
         return schema;
     };
@@ -112,7 +113,7 @@ public class Parser {
 
             schema.put("items", schemaFromJson(arrayItem));
         }
-
+        schema.put("required", true);
         return schema;
     };
 
@@ -137,7 +138,9 @@ public class Parser {
 
             SchemaAware valueSerializer = getValueSerializer(valueAsJavaType);
 
-            return (ObjectNode) valueSerializer.getSchema(OBJECT_MAPPER.getSerializerProvider(), null);
+            ObjectNode n = (ObjectNode) valueSerializer.getSchema(OBJECT_MAPPER.getSerializerProvider(), null);
+            n.put("required", true);
+            return n;
         } catch (JsonMappingException e) {
             throw new GenerationException("Unable to generate a schema for this json example: " + jsonValue, e);
         } catch (JsonProcessingException e) {

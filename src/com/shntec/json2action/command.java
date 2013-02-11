@@ -12,6 +12,9 @@ import java.util.List;
 import java.net.*;
 
 import org.apache.commons.lang.StringUtils;
+import org.eel.kitchen.jsonschema.main.JsonSchemaFactory;
+//import org.eel.kitchen.jsonschema.main.JsonSchema;
+//import org.eel.kitchen.jsonschema.main.JsonSchemaFactory;
 
 import com.sun.codemodel.JClassAlreadyExistsException;
 import com.sun.codemodel.JCodeModel;
@@ -26,12 +29,12 @@ public class command {
 	 */
 	public static void main(String[] args) throws IOException, JClassAlreadyExistsException {
 		// TODO Auto-generated method stub
-		
+		//JsonSchemaFactory f = JsonSchemaFactory.defaultFactory();
 		String ParentPath = new File(command.class.getResource("/").getPath()).getParent();
 //		String 	inputdir = "/Users/xiehuajun/Documents/workspace/Json2Action/example/input", 
 //				outputdir = "/home/netbsd/workspace/Json2Action/example/output";
 		String 	inputdir = ParentPath + "/example/input", 
-				outputdir = ParentPath + "/example/output";
+				outputdir = ParentPath + "/example/output/java";
 		File[] list = new File(inputdir).listFiles();
 
 		for (int i = 0; i < list.length; i++)
@@ -40,7 +43,7 @@ public class command {
 			{
 				String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
 				URL url = list[i].toURI().toURL();
-				Generator gen = new Generator("com.shntec", classname, url);
+				Generator gen = new Generator("com.shntec.json2action.demo", classname, url);
 				JCodeModel codeModel = gen.generate();
 				if (null != codeModel){
 					//codeModel.directClass("com.fasterxml.jackson.databind.JsonNode");
@@ -49,5 +52,9 @@ public class command {
 				}
 			}
 		}
+		
+		//JsonSchemaFactory factory = JsonSchemaFactory.defaultFactory();
+		//JsonSchema schema = factory.
+
 	}
 }
