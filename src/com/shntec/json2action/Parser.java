@@ -1,6 +1,7 @@
 package com.shntec.json2action;
 
 import java.io.*;
+import java.lang.reflect.Field;
 import java.net.*;
 import java.util.Iterator;
 
@@ -53,6 +54,12 @@ public class Parser {
 	};
 	
 	public ObjectNode parse(){
+//		Field field[];
+//		field = getClass().getDeclaredFields();
+//		for(Field f : field)
+//		{
+//			System.out.println(f.getName());
+//		}
 		if (null != content)
 			return schemaFromJson(content);
 		else

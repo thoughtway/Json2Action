@@ -179,7 +179,11 @@ public class Generator {
         		if ("Response" == nodeName)
         		{
         			((JDefinedClass)type)._implements(jClassContainer.owner().ref("ResponseBase"));
-        			createToJson((JDefinedClass)type);
+        			//createToJson((JDefinedClass)type);
+        		}
+        		else if ("Action" == nodeName)
+        		{
+        			((JDefinedClass)type)._extends(jClassContainer.owner().ref("ActionBase"));        			
         		}
         		//type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
         	}
