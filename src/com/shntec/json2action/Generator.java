@@ -2,6 +2,8 @@ package com.shntec.json2action;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.net.*;
 import java.util.ArrayList;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,12 +26,14 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.NullSerializer;
 
+import com.shntec.json2action.demo.ActionBase;
 import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
 import com.sun.codemodel.JClass;
 import com.sun.codemodel.JClassAlreadyExistsException;
 import com.sun.codemodel.JClassContainer;
 import com.sun.codemodel.JCodeModel;
+import com.sun.codemodel.JConditional;
 import com.sun.codemodel.JDefinedClass;
 import com.sun.codemodel.JEnumConstant;
 import com.sun.codemodel.JExpr;
@@ -88,22 +93,135 @@ public class Generator {
 	
 	public Generator(String packagename, String classname, URL jsonfile)
 	{
-		//ObjectNode schemaNode = parser.parse(jsonfile);
 		this.url = jsonfile;
 		this.packagename = packagename;
 		this.classname = classname;
 	};
 	
-	public void generate(JCodeModel codeModel) throws JClassAlreadyExistsException{
-		if (null != this.url)
+	public Generator(String packagename)
+	{
+		this.packagename = packagename;
+	};
+	
+	public void genBaseClass(JCodeModel codeModel) throws JClassAlreadyExistsException{
+		JPackage jp = codeModel._package(this.packagename);
+		
+		JDefinedClass respBase = jp._class(JMod.PUBLIC|JMod.ABSTRACT, "ResponseBase");
+		createToJSON(respBase);
+		
+		JDefinedClass handlerInterface = jp._interface("IActionHandler");
+		handlerInterface.method(JMod.PUBLIC, respBase, "doAction");
+//		handlerInterface.method(JMod.PUBLIC, String.class, "getJsonSchema");
+		
+		JDefinedClass handlerBase = jp._class(JMod.PUBLIC|JMod.ABSTRACT, "ActionHandler");
+		handlerBase.method(JMod.PUBLIC|JMod.ABSTRACT, respBase, "doAction");
+		handlerBase.method(JMod.PUBLIC|JMod.ABSTRACT, String.class, "getJsonSchema");
+		handlerBase.method(JMod.PUBLIC|JMod.ABSTRACT, codeModel.ref("ActionBase"), "getAction");
+		
+		JDefinedClass errorResp = jp._class("ErrorResponse");
+		errorResp._extends(respBase);
+		errorResp.field(JMod.PUBLIC, String.class, "More");
+		errorResp.field(JMod.PUBLIC, codeModel.INT, "Code");		
+		JMethod errorRespConstructor = errorResp.constructor(JMod.PUBLIC);
+		errorRespConstructor.param(String.class, "More");
+		errorRespConstructor.param(codeModel.INT, "Code");
+		errorRespConstructor.body().directStatement("this.More = More;");
+		errorRespConstructor.body().directStatement("this.Code = Code;");
+		errorResp.method(JMod.PUBLIC, String.class, "getMore").body()._return(JExpr.refthis("More"));
+		errorResp.method(JMod.PUBLIC, codeModel.INT, "getCode").body()._return(JExpr.refthis("Code"));
+		JDefinedClass emptyResp = jp._class("EmptyResponse");
+		emptyResp._extends(respBase);
+		
+		JDefinedClass actionBase = jp._class(JMod.ABSTRACT | JMod.PUBLIC, "ActionBase");
+		actionBase.method(JMod.ABSTRACT | JMod.PUBLIC, codeModel.VOID, "setName").param(String.class, "Name");
+		actionBase.method(JMod.ABSTRACT | JMod.PUBLIC, codeModel.VOID, "setMsg").param(String.class, "Msg");
+		actionBase.method(JMod.ABSTRACT | JMod.PUBLIC, codeModel.VOID, "setResult").param(Boolean.class, "Result");
+		actionBase.method(JMod.ABSTRACT | JMod.PUBLIC, codeModel.VOID, "setCode").param(Integer.class, "Code");
+		createToJSON(actionBase);
+		
+		//ExceptionAction
+		
+		JDefinedClass exceptionAction = jp._class(JMod.PUBLIC, "ExceptionAction");
+		exceptionAction._extends(codeModel.ref("ActionHandler"));
+		exceptionAction.field(JMod.PRIVATE, codeModel.ref("ActionHandler"), "hSource").init(JExpr._null());
+		exceptionAction.field(JMod.PRIVATE, codeModel.ref(ValidationReport.class), "vReport").init(JExpr._null());
+		exceptionAction.field(JMod.PRIVATE, codeModel.ref("ErrorResponse"), "eResp").init(JExpr._null());
+		JMethod eConstructor = exceptionAction.constructor(JMod.PUBLIC);
+		eConstructor.param(codeModel.ref(ValidationReport.class), "report");
+		eConstructor.param(codeModel.ref("ActionHandler"), "src");
+		eConstructor.body().directStatement("hSource = src;");
+		eConstructor.body().directStatement("vReport = report;");
+		eConstructor.body().directStatement("eResp = new ErrorResponse(vReport.getMessages().get(1), 5001);");
+		
+		JBlock e_getaction = exceptionAction.method(JMod.PUBLIC, codeModel.ref("ActionBase"), "getAction").body();
+		e_getaction.directStatement("hSource.getAction().setResult(false);");
+		e_getaction.directStatement("hSource.getAction().setMsg(\"缺少必要的参数。\");");
+		e_getaction.directStatement("hSource.getAction().setCode(500);");
+		e_getaction._return(JExpr.direct("(ActionBase)hSource.getAction()"));
+		
+		exceptionAction.method(JMod.PUBLIC, codeModel.ref("ResponseBase"), "doAction").body()._return(JExpr.direct("(ResponseBase)eResp"));
+		exceptionAction.method(JMod.PUBLIC, String.class, "getJsonSchema").body()._return(JExpr.direct("\"{}\""));
+	};
+	
+	public void genFactoryClass(JCodeModel codeModel, Map<String, String> PointMap) throws JClassAlreadyExistsException{
+		JPackage jp = codeModel._package(this.packagename);
+		JDefinedClass actionFactory = jp._class("ActionFactory");
+		JClass mapclass = codeModel.ref(Map.class).narrow(String.class,Class.class);
+		JClass hashmapclass = codeModel.ref(HashMap.class).narrow(String.class,Class.class);
+		
+		actionFactory.field(JMod.PRIVATE, mapclass, "ActionClassMap").init(JExpr._new(hashmapclass));
+		JMethod constructor = actionFactory.constructor(JMod.PUBLIC);
+		JBlock jBlock = constructor.body();
+		
+		Iterator iter = PointMap.entrySet().iterator();
+		while (iter.hasNext())
 		{
-			ObjectNode schemaNode = parser.parse(this.url);
-			Schema schema = new Schema(null, schemaNode);
+			Map.Entry entry = (Map.Entry) iter.next();
+			String key = (String)entry.getKey();
+			String val = (String)entry.getValue();
 			
-			JPackage jpackage = codeModel._package(this.packagename);
-			
-			_generator(this.classname, schemaNode, jpackage, schema);
+			jBlock.directStatement("ActionClassMap.put(\"" + key + "\", " + val + ".class);");
 		}
+		//JMethod validateRequest = actionFactory.method(JMod.PUBLIC, ValidationReport.class, "ValidateRequest");
+		//validateRequest.param(String.class, "rawdata");
+		
+		createValidate(actionFactory);
+		JMethod getAction = actionFactory.method(JMod.PUBLIC, codeModel.ref("ActionHandler"), "getAction");
+		getAction.param(String.class, "RequestJSON");
+		// JsonProcessingException, IOException
+		getAction._throws(JsonProcessingException.class);
+		getAction._throws(IOException.class);
+		getAction._throws(InstantiationException.class);
+		getAction._throws(IllegalAccessException.class);
+		getAction.body().decl(codeModel.ref(ObjectMapper.class), "mapper").init(JExpr._new(codeModel.ref(ObjectMapper.class)));
+		getAction.body().decl(codeModel.ref(JsonNode.class), "root").init(JExpr._null());
+		getAction.body().directStatement("root = mapper.readTree(RequestJSON);");
+		JConditional if1block = getAction.body()._if(JExpr.direct("root.has(\"Action\") && root.get(\"Action\").has(\"Name\")"));
+		JConditional if2block = if1block._then()._if(JExpr.direct("null != ActionClassMap.get(root.get(\"Action\").get(\"Name\").asText())"));
+		if2block._then().decl(codeModel.ref(ValidationReport.class), "report");
+		if2block._then().decl(codeModel.ref("ActionHandler"), "handler").init(JExpr.direct("(ActionHandler)(ActionClassMap.get(root.get(\"Action\").get(\"Name\").asText()).newInstance())"));
+		if2block._then().decl(codeModel.ref(JsonNode.class), "schemanode").init(JExpr.direct("mapper.readTree(handler.getJsonSchema())"));
+		if2block._then().decl(codeModel.ref(ObjectNode.class), "propertiesnode").init(JExpr.direct("(ObjectNode)(schemanode.get(\"properties\"))"));
+		if2block._then()._if(JExpr.direct("propertiesnode.has(\"Response\")"))._then().directStatement("propertiesnode.remove(\"Response\");");
+		if2block._then().directStatement("report = validate(RequestJSON, schemanode.toString());");
+		JConditional if3block = if2block._then()._if(JExpr.direct("report.isSuccess()"));
+		if3block._then()._return(JExpr.ref("handler"));
+		if3block._else()._return(JExpr.direct("new ExceptionAction(report, handler)"));
+		if2block._else()._return(JExpr._new(codeModel.ref("UnkownAction")));
+		
+		getAction.body()._return(JExpr._new(codeModel.ref("UnkownAction")));
+	}
+	
+	public JType generate(JCodeModel codeModel, String classname, URL url) throws JClassAlreadyExistsException{
+		this.url = url;
+		this.classname = classname;
+		
+		ObjectNode schemaNode = parser.parse(this.url);
+		Schema schema = new Schema(null, schemaNode);
+		
+		JPackage jpackage = codeModel._package(this.packagename);
+			
+		return _generator(this.classname, schemaNode, jpackage, schema);
 	};
 	
 	public JCodeModel generate() throws JClassAlreadyExistsException{
@@ -123,6 +241,29 @@ public class Generator {
 			return null;
 	};
 	
+	private void createToJSON(JDefinedClass jClass){
+		JMethod a2json = jClass.method(JMod.PUBLIC, String.class, "ToJson");
+		//throws IllegalArgumentException, SecurityException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, JsonGenerationException, JsonMappingException, IOException
+		a2json._throws(IllegalArgumentException.class);
+		a2json._throws(SecurityException.class);
+		a2json._throws(IllegalAccessException.class);
+		a2json._throws(InvocationTargetException.class);
+		a2json._throws(NoSuchMethodException.class);
+		a2json._throws(JsonGenerationException.class);
+		a2json._throws(JsonMappingException.class);
+		a2json._throws(IOException.class);
+		JClass fieldclass = jClass.owner().ref(Field.class);
+		JClass mapclass = jClass.owner().ref(Map.class).narrow(String.class,Object.class);
+		JClass hashmapclass = jClass.owner().ref(HashMap.class).narrow(String.class,Object.class);
+		JClass objectmapclass =jClass.owner().ref(ObjectMapper.class);
+		a2json.body().decl(fieldclass, "field[]").init(JExpr.direct("this.getClass().getDeclaredFields()"));
+		a2json.body().decl(objectmapclass, "objectmap").init(JExpr._new(objectmapclass));
+		a2json.body().decl(mapclass, "map").init(JExpr._new(hashmapclass));
+		JBlock jforeachBlock = a2json.body().forEach((JType)fieldclass, "f", JExpr.ref("field")).body();
+		jforeachBlock._if(JExpr.direct("\"this$0\" != f.getName()"))._then().directStatement("map.put(f.getName(), this.getClass().getMethod(\"get\" + f.getName()).invoke(this));");
+		a2json.body()._return(JExpr.direct("objectmap.writeValueAsString(map)"));
+	}
+	
 	private JType _generator(String nodeName, JsonNode schemaNode, JClassContainer generatableType, Schema schema) throws JClassAlreadyExistsException{
 		JType javaType = null;
 		if (schemaNode.has("$ref"))
@@ -131,7 +272,7 @@ public class Generator {
 		}
 		else
 		{
-			System.out.println("no ref");
+			//System.out.println("no ref");
 			if (schemaNode.has("enum")) {
 				javaType = enumProccess(nodeName, schemaNode, generatableType, schema);
 			}
@@ -155,7 +296,7 @@ public class Generator {
         if (node.has("type")) {
             typename = node.get("type").asText();
         }
-        System.out.println(typename);
+        //System.out.println(typename);
         
         if (typename.equals("string")) {
         	type = jClassContainer.owner().ref(String.class);
@@ -183,18 +324,24 @@ public class Generator {
         		}
         		else if ("Action" == nodeName)
         		{
-        			((JDefinedClass)type)._extends(jClassContainer.owner().ref("ActionBase"));        			
+        			((JDefinedClass)type)._extends(jClassContainer.owner().ref("ActionBase"));
+        			
         		}
         		//type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
         	}
         	else
         	{
         		type = objectProcess(nodeName, node, jClassContainer.getPackage(), currentSchema);
-        		JFieldVar schemaField = ((JDefinedClass)type).field(JMod.PRIVATE|JMod.STATIC, jClassContainer.owner().ref(String.class), "JSONSCHEMA");
+        		JFieldVar schemaField = ((JDefinedClass)type).field(JMod.PRIVATE|JMod.FINAL, jClassContainer.owner().ref(String.class), "JSONSCHEMA");
+        		
+        		((JDefinedClass)type)._extends(jClassContainer.owner().ref("ActionHandler"));
         		schemaField.init(JExpr.lit(node.toString()));
+        		
+        		((JDefinedClass)type).method(JMod.PUBLIC, String.class, "getJsonSchema").body()._return(JExpr.refthis("JSONSCHEMA"));
+        		
         		createConstructor((JDefinedClass)type, node);
         		createDoAction((JDefinedClass)type);
-        		createValidate((JDefinedClass)type);
+        		//createValidate((JDefinedClass)type);
         	}
         }
         else if (typename.equals("array")){
@@ -207,20 +354,13 @@ public class Generator {
 		return type;
 	};
 	
-	private void createToJson(JDefinedClass jClass){
-		//Map m = jClass.fields();
-		//Iterator it = m.entrySet().iterator();
-		//ObjectMapper mapper = new ObjectMapper();
-		JMethod toJsonFunc = jClass.method(JMod.PUBLIC, String.class, "ToJson");
-		toJsonFunc.body().directStatement("");
-	};
-	
 	private void createValidate(JDefinedClass jClass){
 		JMethod validatefunc = jClass.method(JMod.PRIVATE, ValidationReport.class, "validate");
 		validatefunc._throws(IOException.class);
 		
 		JBlock jBlock = validatefunc.body();
 		validatefunc.param(String.class, "rawdata");
+		validatefunc.param(String.class, "schemastr");
 		//ObjectMapper objectmap = new ObjectMapper();
 		JClass jClass_varomImpl = jClass.owner().ref(ObjectMapper.class);
 		JVar jvaromImpl = jBlock.decl(jClass_varomImpl, "objectmap");
@@ -229,7 +369,7 @@ public class Generator {
 		//JsonNode schema = objectmap.readTree(JSONSCHEMA);
 		JClass jClass_varschemanodeImpl = jClass.owner().ref(JsonNode.class);
 		JVar jvarschemanodeImpl = jBlock.decl(jClass_varschemanodeImpl, "schemanode");
-		jvarschemanodeImpl.init(JExpr.direct("objectmap.readTree(JSONSCHEMA)"));
+		jvarschemanodeImpl.init(JExpr.direct("objectmap.readTree(schemastr)"));
 
 		//JsonSchemaFactory factory = JsonSchemaFactory.defaultFactory();
 		JClass jClass_varfactoryImpl = jClass.owner().ref("org.eel.kitchen.jsonschema.main.JsonSchemaFactory");
@@ -249,36 +389,17 @@ public class Generator {
 	};
 	
 	private void createDoAction(JDefinedClass jClass){
-		Map m = jClass.fields();
-		Iterator it = m.entrySet().iterator();
-		boolean hasResponse = false;
-		
-		while(it.hasNext())
-		{
-			Map.Entry entry = (Map.Entry) it.next();
-            Object key = entry.getKey();
-            Object value = entry.getValue();
-            if (key == "Response")
-            {
-            	hasResponse = true;
-            	break;
-            }
-		};
 		JMethod doFunction = null;
-		if (!hasResponse)
-			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().VOID, "doAction");
-		else
-		{
-			doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("ResponseBase"), "doAction");
-			doFunction.body()._return(JExpr._null());
-		}
+		
+		doFunction = jClass.method(JMod.PUBLIC, jClass.owner().ref("ResponseBase"), "doAction");
+		doFunction.body()._return(JExpr._new(jClass.owner().ref("EmptyResponse")));
 	};
 	
 	private void createConstructor(JDefinedClass jClass, JsonNode node){
 		JMethod constructor = jClass.constructor(JMod.PUBLIC);
 		JBlock jBlock = constructor.body();
 		jBlock.directStatement("Action = new Action();");
-		jBlock.directStatement("Parameter = new Parameter();");
+		//jBlock.directStatement("Parameter = new Parameter();");
 		
 		ObjectMapper O_MAPPER = new ObjectMapper();
 		JsonNode root = null;
@@ -301,7 +422,6 @@ public class Generator {
 		if (root.has("Action"))
 		{
 			JsonNode anode = root.get("Action");
-			System.out.println(node);
 			//jBlock.directStatement("Action.")
 			Iterator it = anode.fields();
 			
@@ -320,6 +440,14 @@ public class Generator {
 		        
 			}
 		}
+		
+		if (root.has("Parameter"))
+		{
+			jBlock.directStatement("Parameter = new Parameter();");
+		}
+		
+		//((ObjectNode)root).remove("Response");
+		
 		//constructor.param(jClass.owner().ref("String"), "RequestJson");
 	}
 	

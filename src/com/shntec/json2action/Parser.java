@@ -54,12 +54,6 @@ public class Parser {
 	};
 	
 	public ObjectNode parse(){
-//		Field field[];
-//		field = getClass().getDeclaredFields();
-//		for(Field f : field)
-//		{
-//			System.out.println(f.getName());
-//		}
 		if (null != content)
 			return schemaFromJson(content);
 		else
