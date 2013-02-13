@@ -151,7 +151,7 @@ public class Generator {
 		eConstructor.param(codeModel.ref("ActionHandler"), "src");
 		eConstructor.body().directStatement("hSource = src;");
 		eConstructor.body().directStatement("vReport = report;");
-		eConstructor.body().directStatement("eResp = new ErrorResponse(vReport.getMessages().get(1), 5001);");
+		eConstructor.body().directStatement("eResp = new ErrorResponse(vReport.getMessages().get(0), 5001);");
 		
 		JBlock e_getaction = exceptionAction.method(JMod.PUBLIC, codeModel.ref("ActionBase"), "getAction").body();
 		e_getaction.directStatement("hSource.getAction().setResult(false);");
@@ -319,7 +319,7 @@ public class Generator {
         		propertiesProccess(nodeName, node.get("properties"), (JDefinedClass)type, currentSchema);
         		if ("Response" == nodeName)
         		{
-        			((JDefinedClass)type)._implements(jClassContainer.owner().ref("ResponseBase"));
+        			((JDefinedClass)type)._extends(jClassContainer.owner().ref("ResponseBase"));
         			//createToJson((JDefinedClass)type);
         		}
         		else if ("Action" == nodeName)
