@@ -15,8 +15,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+
 import org.apache.commons.lang.StringUtils;
 import org.eel.kitchen.jsonschema.main.JsonSchemaFactory;
+import org.hisrc.jscm.codemodel.JSCodeModel;
+import org.hisrc.jscm.codemodel.JSProgram;
+import org.hisrc.jscm.codemodel.impl.CodeModelImpl;
+import org.hisrc.jscm.codemodel.writer.CodeWriter;
 //import org.eel.kitchen.jsonschema.main.JsonSchema;
 //import org.eel.kitchen.jsonschema.main.JsonSchemaFactory;
 
@@ -43,15 +50,41 @@ public class command {
 	 * @param args
 	 * @throws IOException 
 	 * @throws JClassAlreadyExistsException 
+	 * @throws NoSuchFieldException 
+	 * @throws SecurityException 
 	 */
-	public static void main(String[] args) throws IOException, JClassAlreadyExistsException {
+	public static void main(String[] args) throws IOException, JClassAlreadyExistsException, SecurityException, NoSuchFieldException {
 		// TODO Auto-generated method stub
 		String ParentPath = new File(command.class.getResource("/").getPath()).getParent();
 		String 	inputdir = ParentPath + "/example/input", 
 				outputdir = ParentPath + "/example/output/java";
-		File[] list = new File(inputdir).listFiles();
 		String packagename = "com.shntec.json2action.demo";
+		
+		OptionParser parser = new OptionParser( "i:o:p:" );
+		OptionSet options = parser.parse(args);
+		
+		if (options.has( "i" ) && options.hasArgument("i"))
+		{
+			inputdir = (String) options.valueOf("i");
+		}
+		
+		if (options.has( "o" ) && options.hasArgument("o"))
+		{
+			outputdir = (String) options.valueOf("o");
+		}
+		
+		if (options.has("p") && options.hasArgument("p"))
+		{
+			packagename = (String) options.valueOf("p");
+		}
+		
+		File[] list = new File(inputdir).listFiles();
+		
 		JCodeModel codeModel = new JCodeModel();
+//		JSCodeModel jscm = new CodeModelImpl();
+//		JSProgram jspro = jscm.program();
+//		jspro.functionDeclaration("TEST");
+//		jspro.var("test").getExpression();
 		Generator gen = new Generator(packagename);
 		Map<String, String> c2fmap = new HashMap<String, String>();
 		
@@ -71,6 +104,8 @@ public class command {
 		}
 		gen.genFactoryClass(codeModel, c2fmap);
 		codeModel.build(new File(outputdir));
-
+		
+		//jscm.decimal("test");
+		//new CodeWriter(System.out).program(jspro);
 	};
 }
