@@ -26,7 +26,7 @@ import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.NullSerializer;
 
-import com.shntec.json2action.demo.ActionBase;
+//import com.shntec.json2action.demo.ActionBase;
 import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
 import com.sun.codemodel.JClass;
