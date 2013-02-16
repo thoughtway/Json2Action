@@ -73,7 +73,6 @@ public class command {
 		OptionSet options = null;
 		try{
 			options = parser.parse(args);
-			
 		}
 		catch (Exception e)
 		{
@@ -91,7 +90,20 @@ public class command {
 			packagename = (String) options.valueOf("p");
 			File[] list = new File(inputdir).listFiles();
 			
+			outputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "java"):(outputdir + "/java"));
+			
+			File javadir = new File(outputdir);
+			if (!javadir.exists())
+			{
+				if (!javadir.mkdirs())
+				{
+					System.out.println("create path: " + outputdir + " error!");
+					return;
+				}
+			}
+			
 			JCodeModel codeModel = new JCodeModel();
+			JSCodeModel jscodeModel = new CodeModelImpl();
 			Generator gen = new Generator(packagename);
 			Map<String, String> c2fmap = new HashMap<String, String>();
 			

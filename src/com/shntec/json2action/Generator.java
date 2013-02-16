@@ -208,18 +208,24 @@ public class Generator {
 			String val = (String)entry.getValue();
 			
 			jBlock.directStatement("ActionClassMap.put(\"" + key + "\", " + val + ".class);");
-			createHandlerGetter(codeModel, actionFactory, val);
+			//createHandlerGetter(codeModel, actionFactory, val);
+			createHandlerInit(codeModel, actionFactory, val);
 		}
 		
 		createValidate(actionFactory);
 		createInitActionHandler(codeModel, actionFactory);
 		JMethod getAction = actionFactory.method(JMod.PUBLIC, codeModel.ref("ActionHandler"), "getAction");
 		getAction.param(String.class, "RequestJSON");
-		// JsonProcessingException, IOException
+		// JsonProcessingException, IOException, IllegalAccessException, IllegalArgumentException, InstantiationException, SecurityException, InvocationTargetException, NoSuchMethodException
 		getAction._throws(JsonProcessingException.class);
 		getAction._throws(IOException.class);
 		getAction._throws(InstantiationException.class);
 		getAction._throws(IllegalAccessException.class);
+		getAction._throws(IllegalArgumentException.class);
+		getAction._throws(InstantiationException.class);
+		getAction._throws(SecurityException.class);
+		getAction._throws(InvocationTargetException.class);
+		getAction._throws(NoSuchMethodException.class);
 		getAction.body().decl(codeModel.ref(ObjectMapper.class), "mapper").init(JExpr._new(codeModel.ref(ObjectMapper.class)));
 		getAction.body().decl(codeModel.ref(JsonNode.class), "root").init(JExpr._null());
 		getAction.body().directStatement("root = mapper.readTree(RequestJSON);");
@@ -232,11 +238,90 @@ public class Generator {
 		if2block._then()._if(JExpr.direct("propertiesnode.has(\"Response\")"))._then().directStatement("propertiesnode.remove(\"Response\");");
 		if2block._then().directStatement("report = validate(RequestJSON, schemanode.toString());");
 		JConditional if3block = if2block._then()._if(JExpr.direct("report.isSuccess()"));
+		if3block._then().directStatement("String methodName = \"init\" + ActionClassMap.get(root.get(\"Action\").get(\"Name\").asText()).getSimpleName();");
+		if3block._then().directStatement("this.getClass().getMethod(methodName, ActionHandler.class, String.class).invoke(this, handler, RequestJSON);");
+		//JsonNode.class
+		//Method m = this.getClass().getMethod(name, parameterTypes)
+		//JsonNode.class.getMethod(name, parameterTypes)
 		if3block._then()._return(JExpr.ref("handler"));
 		if3block._else()._return(JExpr.direct("new ExceptionAction(report, handler)"));
 		if2block._else()._return(JExpr._new(codeModel.ref("UnknownAction")));
 		
 		getAction.body()._return(JExpr._new(codeModel.ref("UnknownAction")));
+	}
+	
+	private void createHandlerInit(JCodeModel codeModel, JDefinedClass jClass, String HandlerName) throws SecurityException, NoSuchFieldException, JClassAlreadyExistsException
+	{
+		JMethod m = jClass.method(JMod.PUBLIC, codeModel.ref("ActionHandler"), "init" + HandlerName);
+		m._throws(JsonProcessingException.class);
+		m._throws(IOException.class);
+		m._throws(InstantiationException.class);
+		m._throws(IllegalAccessException.class);
+		JVar param1 = m.param(codeModel.ref("ActionHandler"), "handler");
+		JVar param2 = m.param(String.class, "rawdata");
+		m.body().decl(codeModel.ref(HandlerName), "phandler", JExpr.direct("(" + HandlerName + ")handler"));
+		
+		JConditional ifblock = m.body()._if(JExpr.direct("\"UnknownAction\" != handler.getClass().getSimpleName() && \"ExceptionAction\" != handler.getClass().getSimpleName()"));
+		ifblock._else()._return(JExpr.direct("handler"));
+		
+		JBlock jB = ifblock._then();
+		jB.decl(codeModel.ref(ObjectMapper.class), "mapper").init(JExpr._new(codeModel.ref(ObjectMapper.class)));
+		jB.decl(codeModel.ref(JsonNode.class), "root").init(JExpr._null());
+		jB.directStatement("root = mapper.readTree(rawdata);");
+		//Action init
+		jB.directStatement("phandler.getAction().setSessionID(root.get(\"Action\").get(\"SessionID\").asText());");
+		jB.directStatement("phandler.getAction().setFlag(root.get(\"Action\").get(\"Flag\").asInt());");
+		//Parameter init
+		JDefinedClass handlerClass = null;
+
+		JPackage jp = codeModel._package(packagename);
+		Iterator<JDefinedClass> it = jp.classes();
+		while(it.hasNext()){
+			JDefinedClass c = it.next();
+			//System.out.println(c.fullName());
+			if ((packagename + "." + HandlerName).equalsIgnoreCase(c.fullName()))
+			{
+				handlerClass = c;
+				break;
+			}
+		}
+		
+		if (null != handlerClass)
+		{
+			JFieldVar jJsonSchema = handlerClass.fields().get("JSONSCHEMA");
+			
+			//System.out.println(jJsonSchema.decr().toString());
+			
+			if (null != handlerClass.fields().get("Parameter"))
+			{
+				//System.out.println(handlerClass.fields().get("Parameter").type().fullName());
+				JDefinedClass parameterClass = null;
+				it = handlerClass.classes();
+				while(it.hasNext())
+				{
+					JDefinedClass c = it.next();
+					if(c.name().equalsIgnoreCase("Parameter"))
+					{
+						parameterClass = c;
+						break;
+					}
+				}
+				
+				if (null != parameterClass)
+				{
+					jB.decl(jClass.owner().ref(ArrayList.class), "list");
+
+					processParameterInit(parameterClass, jB, "phandler.getParameter()", "root.get(\"Parameter\")");
+					m.body()._return(JExpr.ref("phandler"));
+
+				}
+			}
+		}
+		else
+		{
+			System.out.println("handlerClass is null");
+		}		
+
 	}
 	
 	private void createHandlerGetter(JCodeModel codeModel, JDefinedClass jClass, String HandlerName) throws SecurityException, NoSuchFieldException, JClassAlreadyExistsException
