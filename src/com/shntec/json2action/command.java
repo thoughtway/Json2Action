@@ -60,52 +60,62 @@ public class command {
 				outputdir = ParentPath + "/example/output/java";
 		String packagename = "com.shntec.json2action.demo";
 		
-		OptionParser parser = new OptionParser( "i:o:p:" );
-		OptionSet options = parser.parse(args);
+		OptionParser parser = new OptionParser( "i:o:p:" ){
+			{
+				accepts("i").withRequiredArg().required()
+                .describedAs( "json定义文件的保存路径" );
+				accepts("o").withRequiredArg().required()
+                .describedAs( "输出的路径" );
+				accepts("p").withRequiredArg().required()
+                .describedAs( "包的全名" );
+			}
+		};
+		OptionSet options = null;
+		try{
+			options = parser.parse(args);
+			
+		}
+		catch (Exception e)
+		{
+			parser.printHelpOn( System.out );
+			return;
+		}
 		
-		if (options.has( "i" ) && options.hasArgument("i"))
+		
+		if (options.has( "i" ) && options.hasArgument("i") &&
+			options.has( "o" ) && options.hasArgument("o") &&
+			options.has("p") && options.hasArgument("p"))
 		{
 			inputdir = (String) options.valueOf("i");
-		}
-		
-		if (options.has( "o" ) && options.hasArgument("o"))
-		{
 			outputdir = (String) options.valueOf("o");
-		}
-		
-		if (options.has("p") && options.hasArgument("p"))
-		{
 			packagename = (String) options.valueOf("p");
-		}
-		
-		File[] list = new File(inputdir).listFiles();
-		
-		JCodeModel codeModel = new JCodeModel();
-//		JSCodeModel jscm = new CodeModelImpl();
-//		JSProgram jspro = jscm.program();
-//		jspro.functionDeclaration("TEST");
-//		jspro.var("test").getExpression();
-		Generator gen = new Generator(packagename);
-		Map<String, String> c2fmap = new HashMap<String, String>();
-		
-		gen.genBaseClass(codeModel);		
-		for (int i = 0; i < list.length; i++)
-		{
-			if (list[i].isFile() && ! list[i].isHidden())
+			File[] list = new File(inputdir).listFiles();
+			
+			JCodeModel codeModel = new JCodeModel();
+			Generator gen = new Generator(packagename);
+			Map<String, String> c2fmap = new HashMap<String, String>();
+			
+			gen.genBaseClass(codeModel);		
+			for (int i = 0; i < list.length; i++)
 			{
-				String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
-				URL url = list[i].toURI().toURL();
-				JDefinedClass jClass = (JDefinedClass)gen.generate(codeModel, classname, url);
-				ObjectMapper objmapper = new ObjectMapper();
-				JsonNode node = objmapper.readTree(new File(URI.create(url.toString())));
+				if (list[i].isFile() && ! list[i].isHidden())
+				{
+					String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
+					URL url = list[i].toURI().toURL();
+					JDefinedClass jClass = (JDefinedClass)gen.generate(codeModel, classname, url);
+					ObjectMapper objmapper = new ObjectMapper();
+					JsonNode node = objmapper.readTree(new File(URI.create(url.toString())));
 
-				c2fmap.put(node.get("Action").get("Name").asText(), classname);
+					c2fmap.put(node.get("Action").get("Name").asText(), classname);
+				}
 			}
+			gen.genFactoryClass(codeModel, c2fmap);
+			codeModel.build(new File(outputdir));
 		}
-		gen.genFactoryClass(codeModel, c2fmap);
-		codeModel.build(new File(outputdir));
+		else
+		{
+			parser.printHelpOn( System.out );
+		}
 		
-		//jscm.decimal("test");
-		//new CodeWriter(System.out).program(jspro);
 	};
 }

@@ -301,36 +301,7 @@ public class Generator {
 
 					processParameterInit(parameterClass, jB, "handler.getParameter()", "root.get(\"Parameter\")");
 					m.body()._return(JExpr.ref("handler"));
-//					Iterator fIt= parameterClass.fields().entrySet().iterator();
-//					while(fIt.hasNext())
-//					{
-//						Map.Entry entry = (Map.Entry) fIt.next();
-//						String key = (String)entry.getKey();
-//						JFieldVar val = (JFieldVar)entry.getValue();
-//						String type = val.type().name();
-//						
-//						if ("String".equalsIgnoreCase(type))
-//						{
-//							jB.directStatement("handler.getParameter().set" + key + "(root.get(\"Parameter\").get(\"" + key + "\").asText())");
-//						}
-//						else if ( "Boolean".equalsIgnoreCase(type))
-//						{							
-//							jB.directStatement("handler.getParameter().set" + key + "(root.get(\"Parameter\").get(\"" + key + "\").asBoolean())");
-//						}
-//						else if ("Double".equalsIgnoreCase(type))
-//						{
-//							jB.directStatement("handler.getParameter().set" + key + "(root.get(\"Parameter\").get(\"" + key + "\").asDouble())");
-//						}
-//						else if ("Integer".equalsIgnoreCase(type))
-//						{
-//							jB.directStatement("handler.getParameter().set" + key + "(root.get(\"Parameter\").get(\"" + key + "\").asInt())");
-//						}
-//						else if (type.startsWith("List"))
-//						{
-//							System.out.println(val.type().boxify().getTypeParameters().get(0).fullName());
-//						}
-//					}
-					//parameterClass.fi
+
 				}
 			}
 		}
