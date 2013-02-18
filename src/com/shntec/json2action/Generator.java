@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.NullSerializer;
-//import com.google.common.base.Function;
 
 import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
