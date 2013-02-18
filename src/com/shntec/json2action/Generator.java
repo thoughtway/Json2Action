@@ -25,8 +25,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.BeanSerializerFactory;
 import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.NullSerializer;
+//import com.google.common.base.Function;
 
-import com.shntec.json2action.demo.ActionBase;
 import com.sun.codemodel.ClassType;
 import com.sun.codemodel.JBlock;
 import com.sun.codemodel.JClass;
@@ -56,6 +56,16 @@ import static javax.lang.model.SourceVersion.*;
 
 import org.apache.commons.lang.WordUtils;
 import org.eel.kitchen.jsonschema.report.ValidationReport;
+import org.hisrc.jscm.codemodel.JSCodeModel;
+import org.hisrc.jscm.codemodel.JSFunctionBody;
+import org.hisrc.jscm.codemodel.JSFunctionDeclaration;
+import org.hisrc.jscm.codemodel.JSProgram;
+import org.hisrc.jscm.codemodel.expression.JSExpression;
+import org.hisrc.jscm.codemodel.expression.JSFunctionExpression.Function;
+import org.hisrc.jscm.codemodel.expression.JSGlobalVariable;
+import org.hisrc.jscm.codemodel.expression.JSObjectLiteral;
+import org.hisrc.jscm.codemodel.expression.JSVariable;
+import org.hisrc.jscm.codemodel.statement.JSIfStatement;
 
 public class Generator {
 	public class ClassAlreadyExistsException extends Exception {
@@ -97,6 +107,29 @@ public class Generator {
 	private boolean genInitCode = false;
 	private JDefinedClass actionFactory = null;
 	private JMethod jM_InitParameter = null;
+	private JSProgram jsActionProg = null;
+	private JSProgram jsClouseProg = null;
+	private JSCodeModel jsCodeModel = null;
+	private JSFunctionDeclaration jsActionAnonymous = null;
+	private JSFunctionDeclaration jsClouseAnonymous = null;
+	
+	public void setJsActionProg(JSProgram prog)
+	{
+		jsActionProg = prog;
+		jsActionAnonymous = jsActionProg.functionDeclaration("");
+		
+	}
+	
+	public void setJsClouseProg(JSProgram prog)
+	{
+		jsClouseProg = prog;
+		jsClouseAnonymous = jsClouseProg.functionDeclaration("");
+	}
+	
+	public void setJsCodeModel(JSCodeModel codemodel)
+	{
+		jsCodeModel = codemodel;
+	}
 	
 	public Generator(String packagename, String classname, URL jsonfile)
 	{
@@ -213,7 +246,7 @@ public class Generator {
 		}
 		
 		createValidate(actionFactory);
-		createInitActionHandler(codeModel, actionFactory);
+		//createInitActionHandler(codeModel, actionFactory);
 		JMethod getAction = actionFactory.method(JMod.PUBLIC, codeModel.ref("ActionHandler"), "getAction");
 		getAction.param(String.class, "RequestJSON");
 		// JsonProcessingException, IOException, IllegalAccessException, IllegalArgumentException, InstantiationException, SecurityException, InvocationTargetException, NoSuchMethodException
@@ -248,6 +281,131 @@ public class Generator {
 		if2block._else()._return(JExpr._new(codeModel.ref("UnknownAction")));
 		
 		getAction.body()._return(JExpr._new(codeModel.ref("UnknownAction")));
+	}
+	
+	public void jsgenerate(URL url, String className) throws JsonProcessingException, IOException{
+		ObjectNode schemaNode = parser.parse(this.url);
+//		Schema schema = new Schema(null, schemaNode);
+		JsonNode content = new ObjectMapper().readTree(new File(URI.create(this.url.toString())));
+		
+		
+		//_jsgenerate(className, schemaNode, jsActionAnonymous.getBody(), schema);
+//		System.out.println(schemaNode);
+// 		if (!schemaNode.has("$ref") && !schemaNode.has("enum"))
+//		{
+			String names[] = className.split("\\.");
+			String clouseName = "";
+			for (int i = 0; i < names.length - 2; i++, clouseName += ".")
+			{
+				clouseName += names[i];
+			}
+//			System.out.println(clouseName);
+			
+			JSGlobalVariable runnerfunc = jsCodeModel.globalVariable(clouseName + "actionrunner.run");
+			clouseName += "do" + names[names.length - 1];
+			
+			JSGlobalVariable jsObject = jsCodeModel.globalVariable(className);
+			JSGlobalVariable jsClouseObject = jsCodeModel.globalVariable(clouseName);
+			
+			Function constructor = jsCodeModel.function();
+			JSVariable constructor_param = constructor.parameter("opts");
+			
+			Function Clouse_constructor = jsCodeModel.function();
+			JSVariable Clouse_constructor_param = Clouse_constructor.parameter("opts");
+			
+			jsActionAnonymous.getBody().expression(jsObject.assign(constructor));
+			jsClouseAnonymous.getBody().expression(jsClouseObject.assign(Clouse_constructor));
+			
+			constructor.getBody().expression(jsCodeModel._this().p("ActionName").assign(jsCodeModel.string(content.get("Action").get("Name").asText())));
+			constructor.getBody().expression(jsCodeModel._this().p("ActionCode").assign(jsCodeModel.string(content.get("Action").get("Code").asText())));
+			
+			JSVariable a = Clouse_constructor.getBody().var("a", jsObject._new()).getVariable();
+			
+			if (content.has("Parameter")){
+				JSObjectLiteral po = jsCodeModel.object();				
+				
+				JsonNode p = content.get("Parameter");
+				Iterator it = p.fields();
+				
+				while(it.hasNext())
+				{
+					Map.Entry entry = (Map.Entry) it.next();
+					String key = (String)entry.getKey();
+					JsonNode val = (JsonNode)entry.getValue();
+					if (!val.isArray())
+					{
+						//po.p(key).assign(constructor_param.p(key));
+						po.append(key, constructor_param.p(key));
+						Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key)));
+					}
+					else
+					{
+						po.append(key, constructor_param.p(key).i("slice").args(jsCodeModel.integer(0)));
+						Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key).i("slice").args(jsCodeModel.integer(0))));
+					}
+				}
+				
+				constructor.getBody().expression(jsCodeModel._this().p("Parameter").assign(po));
+				//jsObject.div(jsCodeModel.integer(0));
+//				JSObjectLiteral o = jsCodeModel.object();
+//				o.append("constructor", jsCodeModel.function());
+			}
+			Function completeFunc = jsCodeModel.function();
+			JSVariable action = completeFunc.parameter("action");
+			completeFunc.parameter("resp");
+			
+			JSIfStatement _if = completeFunc.getBody()._if(constructor_param.and(constructor_param.p("success")).and(action.p("ActionStatus")));
+			_if._then().expression(constructor_param.p("success").i().args(action.p("ActionPayload")));
+			_if._else()._if(constructor_param.and(constructor_param.p("fail")).and(action.p("ActionStatus").not()))._then().expression(constructor_param.p("fail").i().args(action.p("ActionErrorMessage")));
+			Clouse_constructor.getBody().expression(a.i("OnComplete").args(completeFunc));
+			Clouse_constructor.getBody().expression(runnerfunc.i().args(a));
+//		}
+	};
+	
+	private void _jsgenerate(String nodeName, JsonNode schemaNode, JSFunctionBody jsbody, Schema schema)
+	{
+		if (!schemaNode.has("$ref") && !schemaNode.has("enum"))
+		{
+			jstypeproccess(nodeName, jsbody, schemaNode, schema);
+		}
+	}
+	
+	private void jstypeproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
+	{
+		String typename = "any";
+		
+		if (node.has("type") && node.get("type").isArray() && node.get("type").size() > 0) {
+            typename = node.get("type").get(0).asText();
+        }
+		
+        if (node.has("type")) {
+            typename = node.get("type").asText();
+        }
+        
+        if (typename.equalsIgnoreCase("object"))
+        {
+        	if ("Action" == nodeName)
+        	{
+
+        	}
+        }
+        else if (typename.equalsIgnoreCase("array"))
+        {
+        	
+        }
+        else
+        {
+        	
+        }
+	}
+	
+	private JSFunctionBody jsobjectproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
+	{
+		if (null == schema.getId())
+		{
+			
+		}
+		return jsbody;
 	}
 	
 	private void createHandlerInit(JCodeModel codeModel, JDefinedClass jClass, String HandlerName) throws SecurityException, NoSuchFieldException, JClassAlreadyExistsException
@@ -498,11 +656,6 @@ public class Generator {
 				return jC;
 		}
 		return null;
-	}
-	
-	private void proccessLoop(JDefinedClass jClass, JBlock jBlock, String codePrefix, String jsonPrefix)
-	{
-		
 	}
 	
 	private void createInitActionHandler(JCodeModel codeModel, JDefinedClass jClass)
