@@ -282,6 +282,78 @@ public class Generator {
 		getAction.body()._return(JExpr._new(codeModel.ref("UnknownAction")));
 	}
 	
+	public JSProgram nodegenerate(URL url, String className) throws JsonProcessingException, IOException
+	{
+//		module.exports = {
+//				name: 'ACTION_CODE_NONE',
+//				getHeader: function(){
+//					return this._actionH;
+//				},
+//				run: function(header, param){
+//					this._actionH = header;
+//
+//					return {
+//						Product: 'GingoCards',
+//						Version: '1.0.0',
+//						Living: true
+//					};
+//				}
+//			};
+		ObjectNode schemaNode = parser.parse(this.url);
+		JsonNode content = new ObjectMapper().readTree(new File(URI.create(this.url.toString())));
+		JSProgram prog = jsCodeModel.program();
+		
+		JSGlobalVariable jsObject = jsCodeModel.globalVariable("moulde");
+		JSObjectLiteral defineObj = jsCodeModel.object();
+		Function getHeaderFunc = jsCodeModel.function();
+		Function runFunc = jsCodeModel.function();
+		JSVariable headerParam = runFunc.parameter("header");
+		JSVariable paramParam = runFunc.parameter("param");
+		
+		getHeaderFunc.getBody()._return(jsCodeModel._this().p("_actionH"));
+		runFunc.getBody().expression(jsCodeModel._this().p("_actionH").assign(headerParam));		
+		runFunc.getBody().expression(jsCodeModel._this().p("RequestSchema").assign(jsCodeModel.string(schemaNode.toString())));
+		if (content.has("Response"))
+		{
+			runFunc.getBody().expression(jsCodeModel._this().p("ResponseSchema").assign(jsCodeModel.string(((ObjectNode)schemaNode.get("properties")).remove("Response").toString())));
+			
+			JsonNode p = content.get("Response");
+			Iterator it = p.fields();
+			
+			JSObjectLiteral returnObj = jsCodeModel.object();
+			
+			while(it.hasNext())
+			{
+				Map.Entry entry = (Map.Entry) it.next();
+				String key = (String)entry.getKey();
+				JsonNode val = (JsonNode)entry.getValue();
+				
+				if (val.isTextual())
+					returnObj.append(key, jsCodeModel.string(val.asText()));
+				else if (val.isArray())
+					returnObj.append(key, jsCodeModel.array());
+				else if (val.isBoolean())
+					returnObj.append(key, jsCodeModel._boolean(val.asBoolean()));
+				else if (val.isInt())
+					returnObj.append(key, jsCodeModel.integer(val.asInt()));
+				else if (val.isDouble())
+					returnObj.append(key, jsCodeModel.decimal(val.asText()));
+				else if (val.isPojo())
+					returnObj.append(key, jsCodeModel._null());
+			}
+			
+			runFunc.getBody()._return(returnObj);
+		}
+		
+		defineObj.append("name", jsCodeModel.string(content.get("Action").get("Name").asText()));
+		defineObj.append("run", runFunc);
+		defineObj.append("header", getHeaderFunc);
+		
+		prog.expression(jsObject.p("exports").assign(defineObj));
+		
+		return prog;
+	}
+	
 	public void jsgenerate(URL url, String className) throws JsonProcessingException, IOException{
 		ObjectNode schemaNode = parser.parse(this.url);
 		JsonNode content = new ObjectMapper().readTree(new File(URI.create(this.url.toString())));
@@ -356,51 +428,51 @@ public class Generator {
 		Clouse_constructor.getBody().expression(runnerfunc.i().args(a));
 	};
 	
-	private void _jsgenerate(String nodeName, JsonNode schemaNode, JSFunctionBody jsbody, Schema schema)
-	{
-		if (!schemaNode.has("$ref") && !schemaNode.has("enum"))
-		{
-			jstypeproccess(nodeName, jsbody, schemaNode, schema);
-		}
-	}
-	
-	private void jstypeproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
-	{
-		String typename = "any";
-		
-		if (node.has("type") && node.get("type").isArray() && node.get("type").size() > 0) {
-            typename = node.get("type").get(0).asText();
-        }
-		
-        if (node.has("type")) {
-            typename = node.get("type").asText();
-        }
-        
-        if (typename.equalsIgnoreCase("object"))
-        {
-        	if ("Action" == nodeName)
-        	{
-
-        	}
-        }
-        else if (typename.equalsIgnoreCase("array"))
-        {
-        	
-        }
-        else
-        {
-        	
-        }
-	}
-	
-	private JSFunctionBody jsobjectproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
-	{
-		if (null == schema.getId())
-		{
-			
-		}
-		return jsbody;
-	}
+//	private void _jsgenerate(String nodeName, JsonNode schemaNode, JSFunctionBody jsbody, Schema schema)
+//	{
+//		if (!schemaNode.has("$ref") && !schemaNode.has("enum"))
+//		{
+//			jstypeproccess(nodeName, jsbody, schemaNode, schema);
+//		}
+//	}
+//	
+//	private void jstypeproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
+//	{
+//		String typename = "any";
+//		
+//		if (node.has("type") && node.get("type").isArray() && node.get("type").size() > 0) {
+//            typename = node.get("type").get(0).asText();
+//        }
+//		
+//        if (node.has("type")) {
+//            typename = node.get("type").asText();
+//        }
+//        
+//        if (typename.equalsIgnoreCase("object"))
+//        {
+//        	if ("Action" == nodeName)
+//        	{
+//
+//        	}
+//        }
+//        else if (typename.equalsIgnoreCase("array"))
+//        {
+//        	
+//        }
+//        else
+//        {
+//        	
+//        }
+//	}
+//	
+//	private JSFunctionBody jsobjectproccess(String nodeName, JSFunctionBody jsbody, JsonNode node, Schema schema)
+//	{
+//		if (null == schema.getId())
+//		{
+//			
+//		}
+//		return jsbody;
+//	}
 	
 	private void createHandlerInit(JCodeModel codeModel, JDefinedClass jClass, String HandlerName) throws SecurityException, NoSuchFieldException, JClassAlreadyExistsException
 	{

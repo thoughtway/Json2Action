@@ -74,28 +74,17 @@ public class command {
 		String 	inputdir = ParentPath + "/example/input", 
 				outputdir = ParentPath + "/example/output/java",
 				jsoutputdir = ParentPath + "/example/output/js",
+				nodeoutputdir = ParentPath + "/example/output/node",
 				jsprefix = "";
 		String packagename = "com.shntec.json2action.demo";
 		
-//		if (true)
-//		{
-			JSCodeModel c = new CodeModelImpl();
-//			JSGlobalVariable a = c.globalVariable("g");
-			//a.assign(c.integer(2));
-			JSProgram actionsprog = c.program();
-			JSProgram clouseprog = c.program();
-//			prog.expression(a);
-		//	Function jsfunc = c.function();
-			//prog.expression(jsfunc);
-			//func.getBody().getSourceElements().add(a.assign(c.integer(2))) ;//.expression(a.assign(c.function()));
-			
-//			CodeWriter f = new CodeWriter(System.out);
-			//f.expression(prog.functionDeclaration("").getFunctionExpression().brackets());
-//			f.program(prog);
-//			return;
-//		}
+		Boolean js = false, node = false;
 		
-		OptionParser parser = new OptionParser( "i:o:p:j:" ){
+		JSCodeModel c = new CodeModelImpl();
+		JSProgram actionsprog = c.program();
+		JSProgram clouseprog = c.program();
+		
+		OptionParser parser = new OptionParser( "i:o:p:j:n" ){
 			{
 				accepts("i").withRequiredArg().required()
                 .describedAs( "json定义文件的保存路径" );
@@ -103,8 +92,8 @@ public class command {
                 .describedAs( "输出的路径" );
 				accepts("p").withRequiredArg().required()
                 .describedAs( "包的全名" );
-				accepts("j").withRequiredArg().required()
-                .describedAs( "js对象的前缀" );
+				accepts("j").withRequiredArg().describedAs( "js对象的前缀" );
+				accepts("n").withOptionalArg().describedAs("是否输出node.js的代码");
 			}
 		};
 		OptionSet options = null;
@@ -125,14 +114,28 @@ public class command {
 			inputdir = (String) options.valueOf("i");
 			outputdir = (String) options.valueOf("o");
 			packagename = (String) options.valueOf("p");
-			jsprefix = (String) options.valueOf("j");
+			if (options.has("j") && options.hasArgument("j"))
+			{
+				js = true;
+				jsprefix = (String) options.valueOf("j");
+				
+				if (options.has("n"))
+				{
+					node = true;
+				}
+			}
+						
+			
 			File[] list = new File(inputdir).listFiles();
 			
 			jsoutputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "js"):(outputdir + "/js"));
+			nodeoutputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "node/" + jsprefix):(outputdir + "/node/" + jsprefix));
 			outputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "java"):(outputdir + "/java"));
+			
 			
 			File javadir = new File(outputdir);
 			File jsdir = new File(jsoutputdir);
+			File nodedir = new File(nodeoutputdir);
 			if (!javadir.exists())
 			{
 				if (!javadir.mkdirs())
@@ -142,7 +145,7 @@ public class command {
 				}
 			}
 			
-			if (!jsdir.exists())
+			if (!jsdir.exists() && js)
 			{
 				if (!jsdir.mkdirs())
 				{
@@ -151,13 +154,26 @@ public class command {
 				}
 			}
 			
+			if (!nodedir.exists() && node)
+			{
+				if (!nodedir.mkdirs())
+				{
+					System.out.println("create path: " + nodeoutputdir + " error!");
+					return;
+				}
+			}
+			
 			JCodeModel codeModel = new JCodeModel();
 			JSCodeModel jscodeModel = new CodeModelImpl();
 			Generator gen = new Generator(packagename);
 			
-			gen.setJsCodeModel(c);
-			gen.setJsActionProg(actionsprog);
-			gen.setJsClouseProg(clouseprog);
+			
+			if (js)
+			{
+				gen.setJsCodeModel(c);
+				gen.setJsActionProg(actionsprog);
+				gen.setJsClouseProg(clouseprog);
+			}
 			
 			Map<String, String> c2fmap = new HashMap<String, String>();
 			
@@ -169,40 +185,56 @@ public class command {
 					String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
 					URL url = list[i].toURI().toURL();
 					gen.generate(codeModel, classname, url);
-					gen.jsgenerate(url, jsprefix + ".actions." + classname.toLowerCase());
+					if (js)
+					{
+						gen.jsgenerate(url, jsprefix + ".actions." + classname.toLowerCase());
+					}
+					
 					ObjectMapper objmapper = new ObjectMapper();
-					JsonNode node = objmapper.readTree(new File(URI.create(url.toString())));
+					JsonNode jsonnode = objmapper.readTree(new File(URI.create(url.toString())));
 
-					c2fmap.put(node.get("Action").get("Name").asText(), classname);
+					c2fmap.put(jsonnode.get("Action").get("Name").asText(), classname);
+					if (node)
+					{
+						String filename = nodedir + "/" + classname + ".js";
+						JSProgram prog = gen.nodegenerate(url, jsprefix);
+						FileWriter f = new FileWriter(filename);
+						new CodeWriter(f).program(prog);
+						f.flush();
+						f.close();
+					}
 				}
 			}
 			gen.genFactoryClass(codeModel, c2fmap);
 			codeModel.build(new File(outputdir));
+			if (js)
+			{
+				String actionjsfile = jsoutputdir + "/actions.js";
+				String clousejsfile = jsoutputdir + "/" + jsprefix + ".js";
+				FileWriter fw1 = new FileWriter(actionjsfile),
+						fw2 = new FileWriter(clousejsfile);
+				
+				CodeWriter f1 = new CodeWriter(fw1);
+				f1.openRoundBracket();
+				f1.program(actionsprog);
+				f1.closeRoundBracket();
+				f1.openRoundBracket();
+				f1.closeRoundBracket();
+				f1.semicolon();
+				fw1.flush();
+				fw1.close();
+				
+				CodeWriter f2 = new CodeWriter(fw2);
+				f2.openRoundBracket();
+				f2.program(clouseprog);
+				f2.closeRoundBracket();
+				f2.openRoundBracket();
+				f2.closeRoundBracket();
+				f2.semicolon();			
+				fw2.flush();
+				fw2.close();
+			}
 			
-			String actionjsfile = jsoutputdir + "/actions.js";
-			String clousejsfile = jsoutputdir + "/" + jsprefix + ".js";
-			FileWriter fw1 = new FileWriter(actionjsfile),
-					fw2 = new FileWriter(clousejsfile);
-			
-			CodeWriter f1 = new CodeWriter(fw1);
-			f1.openRoundBracket();
-			f1.program(actionsprog);
-			f1.closeRoundBracket();
-			f1.openRoundBracket();
-			f1.closeRoundBracket();
-			f1.semicolon();
-			fw1.flush();
-			fw1.close();
-			
-			CodeWriter f2 = new CodeWriter(fw2);
-			f2.openRoundBracket();
-			f2.program(clouseprog);
-			f2.closeRoundBracket();
-			f2.openRoundBracket();
-			f2.closeRoundBracket();
-			f2.semicolon();			
-			fw2.flush();
-			fw2.close();
 		}
 		else
 		{
