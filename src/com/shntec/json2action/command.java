@@ -168,7 +168,7 @@ public class command {
 				{
 					String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
 					URL url = list[i].toURI().toURL();
-					JDefinedClass jClass = (JDefinedClass)gen.generate(codeModel, classname, url);
+					gen.generate(codeModel, classname, url);
 					gen.jsgenerate(url, jsprefix + ".actions." + classname.toLowerCase());
 					ObjectMapper objmapper = new ObjectMapper();
 					JsonNode node = objmapper.readTree(new File(URI.create(url.toString())));
@@ -179,10 +179,10 @@ public class command {
 			gen.genFactoryClass(codeModel, c2fmap);
 			codeModel.build(new File(outputdir));
 			
-			String actionjsfile = jsoutputdir + "/action.js";
+			String actionjsfile = jsoutputdir + "/actions.js";
 			String clousejsfile = jsoutputdir + "/" + jsprefix + ".js";
-			FileWriter fw1 = new FileWriter(actionjsfile, true),
-					fw2 = new FileWriter(clousejsfile, true);
+			FileWriter fw1 = new FileWriter(actionjsfile),
+					fw2 = new FileWriter(clousejsfile);
 			
 			CodeWriter f1 = new CodeWriter(fw1);
 			f1.openRoundBracket();

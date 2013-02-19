@@ -284,81 +284,76 @@ public class Generator {
 	
 	public void jsgenerate(URL url, String className) throws JsonProcessingException, IOException{
 		ObjectNode schemaNode = parser.parse(this.url);
-//		Schema schema = new Schema(null, schemaNode);
 		JsonNode content = new ObjectMapper().readTree(new File(URI.create(this.url.toString())));
+
+		String names[] = className.split("\\.");
+		String clouseName = "";
+		for (int i = 0; i < names.length - 2; i++, clouseName += ".")
+		{
+			clouseName += names[i];
+		}
 		
+		JSGlobalVariable runnerfunc = jsCodeModel.globalVariable(clouseName + "actionrunner.run");
+		clouseName += "do" + names[names.length - 1];
 		
-		//_jsgenerate(className, schemaNode, jsActionAnonymous.getBody(), schema);
-//		System.out.println(schemaNode);
-// 		if (!schemaNode.has("$ref") && !schemaNode.has("enum"))
-//		{
-			String names[] = className.split("\\.");
-			String clouseName = "";
-			for (int i = 0; i < names.length - 2; i++, clouseName += ".")
+		JSGlobalVariable jsObject = jsCodeModel.globalVariable(className);
+		JSGlobalVariable jsClouseObject = jsCodeModel.globalVariable(clouseName);
+		
+		Function constructor = jsCodeModel.function();
+		JSVariable constructor_param = constructor.parameter("opts");
+		
+		Function Clouse_constructor = jsCodeModel.function();
+		JSVariable Clouse_constructor_param = Clouse_constructor.parameter("opts");
+		
+		jsActionAnonymous.getBody().expression(jsObject.assign(constructor));
+		jsClouseAnonymous.getBody().expression(jsClouseObject.assign(Clouse_constructor));
+		
+		constructor.getBody().expression(jsCodeModel._this().p("ActionName").assign(jsCodeModel.string(content.get("Action").get("Name").asText())));
+		constructor.getBody().expression(jsCodeModel._this().p("ActionCode").assign(jsCodeModel.string(content.get("Action").get("Code").asText())));
+		
+		if (content.has("Response"))
+		{
+			constructor.getBody().expression(jsCodeModel._this().p("ResponseSchema").assign(jsCodeModel.string(((ObjectNode)schemaNode.get("properties")).remove("Response").toString())));
+		}
+		
+		constructor.getBody().expression(jsCodeModel._this().p("RequestSchema").assign(jsCodeModel.string(schemaNode.toString())));
+		
+		JSVariable a = Clouse_constructor.getBody().var("a", jsObject._new()).getVariable();
+		
+		if (content.has("Parameter")){
+			JSObjectLiteral po = jsCodeModel.object();				
+			
+			JsonNode p = content.get("Parameter");
+			Iterator it = p.fields();
+			
+			while(it.hasNext())
 			{
-				clouseName += names[i];
-			}
-//			System.out.println(clouseName);
-			
-			JSGlobalVariable runnerfunc = jsCodeModel.globalVariable(clouseName + "actionrunner.run");
-			clouseName += "do" + names[names.length - 1];
-			
-			JSGlobalVariable jsObject = jsCodeModel.globalVariable(className);
-			JSGlobalVariable jsClouseObject = jsCodeModel.globalVariable(clouseName);
-			
-			Function constructor = jsCodeModel.function();
-			JSVariable constructor_param = constructor.parameter("opts");
-			
-			Function Clouse_constructor = jsCodeModel.function();
-			JSVariable Clouse_constructor_param = Clouse_constructor.parameter("opts");
-			
-			jsActionAnonymous.getBody().expression(jsObject.assign(constructor));
-			jsClouseAnonymous.getBody().expression(jsClouseObject.assign(Clouse_constructor));
-			
-			constructor.getBody().expression(jsCodeModel._this().p("ActionName").assign(jsCodeModel.string(content.get("Action").get("Name").asText())));
-			constructor.getBody().expression(jsCodeModel._this().p("ActionCode").assign(jsCodeModel.string(content.get("Action").get("Code").asText())));
-			
-			JSVariable a = Clouse_constructor.getBody().var("a", jsObject._new()).getVariable();
-			
-			if (content.has("Parameter")){
-				JSObjectLiteral po = jsCodeModel.object();				
-				
-				JsonNode p = content.get("Parameter");
-				Iterator it = p.fields();
-				
-				while(it.hasNext())
+				Map.Entry entry = (Map.Entry) it.next();
+				String key = (String)entry.getKey();
+				JsonNode val = (JsonNode)entry.getValue();
+				if (!val.isArray())
 				{
-					Map.Entry entry = (Map.Entry) it.next();
-					String key = (String)entry.getKey();
-					JsonNode val = (JsonNode)entry.getValue();
-					if (!val.isArray())
-					{
-						//po.p(key).assign(constructor_param.p(key));
-						po.append(key, constructor_param.p(key));
-						Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key)));
-					}
-					else
-					{
-						po.append(key, constructor_param.p(key).i("slice").args(jsCodeModel.integer(0)));
-						Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key).i("slice").args(jsCodeModel.integer(0))));
-					}
+					po.append(key, constructor_param.p(key.toLowerCase()));
+					Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase())));
 				}
-				
-				constructor.getBody().expression(jsCodeModel._this().p("Parameter").assign(po));
-				//jsObject.div(jsCodeModel.integer(0));
-//				JSObjectLiteral o = jsCodeModel.object();
-//				o.append("constructor", jsCodeModel.function());
+				else
+				{
+					po.append(key, constructor_param.p(key).i("slice").args(jsCodeModel.integer(0)));
+					Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0))));
+				}
 			}
-			Function completeFunc = jsCodeModel.function();
-			JSVariable action = completeFunc.parameter("action");
-			completeFunc.parameter("resp");
 			
-			JSIfStatement _if = completeFunc.getBody()._if(constructor_param.and(constructor_param.p("success")).and(action.p("ActionStatus")));
-			_if._then().expression(constructor_param.p("success").i().args(action.p("ActionPayload")));
-			_if._else()._if(constructor_param.and(constructor_param.p("fail")).and(action.p("ActionStatus").not()))._then().expression(constructor_param.p("fail").i().args(action.p("ActionErrorMessage")));
-			Clouse_constructor.getBody().expression(a.i("OnComplete").args(completeFunc));
-			Clouse_constructor.getBody().expression(runnerfunc.i().args(a));
-//		}
+			constructor.getBody().expression(jsCodeModel._this().p("Parameter").assign(po));
+		}
+		Function completeFunc = jsCodeModel.function();
+		JSVariable action = completeFunc.parameter("action");
+		completeFunc.parameter("resp");
+		
+		JSIfStatement _if = completeFunc.getBody()._if(constructor_param.and(constructor_param.p("success")).and(action.p("ActionStatus")));
+		_if._then().expression(constructor_param.p("success").i().args(action.p("ActionPayload")));
+		_if._else()._if(constructor_param.and(constructor_param.p("fail")).and(action.p("ActionStatus").not()))._then().expression(constructor_param.p("fail").i().args(action.p("ActionErrorMessage")));
+		Clouse_constructor.getBody().expression(a.i("OnComplete").args(completeFunc));
+		Clouse_constructor.getBody().expression(runnerfunc.i().args(a));
 	};
 	
 	private void _jsgenerate(String nodeName, JsonNode schemaNode, JSFunctionBody jsbody, Schema schema)
@@ -599,17 +594,18 @@ public class Generator {
 				
 				JBlock whileblock = loop.body();
 				String narrowName = val.type().boxify().getTypeParameters().get(0).fullName();
-				System.out.println(narrowName);
+//				System.out.println(narrowName);
 				JDefinedClass cC = getSubClass(jClass, narrowName);
 				//JDefinedClass cC = jClass._class(narrowName);
 				//val.type().boxify().getTypeParameters()
 				whileblock.decl(jClass.owner().ref(JsonNode.class), "node" + count).init(JExpr.direct("(JsonNode)it" + count + ".next()"));
 				if (cC != null)
 				{
-					System.out.println(cC.fullName());					
-					whileblock.decl(cC, "item").init(JExpr.direct(codePrefix + ".new " + narrowName.substring(narrowName.lastIndexOf(".") + 1) + "()"));
-					processParameterInit(cC, whileblock, "item", "node"+count);
-					whileblock.directStatement(prefix + ".add(item);");
+//					System.out.println(cC.fullName());
+					String item_var = "item" + count;
+					whileblock.decl(cC, item_var).init(JExpr.direct(codePrefix + ".new " + narrowName.substring(narrowName.lastIndexOf(".") + 1) + "()"));
+					processParameterInit(cC, whileblock, item_var, "node"+count);
+					whileblock.directStatement(prefix + ".add(" + item_var + ");");
 				}
 				else
 				{
@@ -912,7 +908,7 @@ public class Generator {
 	};
 	
 	private void createConstructor(JDefinedClass jClass, JsonNode node){
-		System.out.println(node);
+//		System.out.println(node);
 		JMethod constructor = jClass.constructor(JMod.PUBLIC);
 		JBlock jBlock = constructor.body();
 		
