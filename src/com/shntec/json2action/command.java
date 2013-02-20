@@ -75,7 +75,8 @@ public class command {
 				outputdir = ParentPath + "/example/output/java",
 				jsoutputdir = ParentPath + "/example/output/js",
 				nodeoutputdir = ParentPath + "/example/output/node",
-				jsprefix = "";
+				jsprefix = "",
+				schemaoutputdir = ParentPath + "/example/output/node";
 		String packagename = "com.shntec.json2action.demo";
 		
 		Boolean js = false, node = false;
@@ -130,12 +131,15 @@ public class command {
 			
 			jsoutputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "js"):(outputdir + "/js"));
 			nodeoutputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "node/" + jsprefix):(outputdir + "/node/" + jsprefix));
+			schemaoutputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "schema"):(outputdir + "/schema"));
 			outputdir = (outputdir.endsWith(File.pathSeparator)? (outputdir + "java"):(outputdir + "/java"));
 			
 			
 			File javadir = new File(outputdir);
 			File jsdir = new File(jsoutputdir);
 			File nodedir = new File(nodeoutputdir);
+			File schemadir = new File(schemaoutputdir);
+			
 			if (!javadir.exists())
 			{
 				if (!javadir.mkdirs())
@@ -163,10 +167,19 @@ public class command {
 				}
 			}
 			
+			if (!schemadir.exists())
+			{
+				if (!schemadir.mkdirs())
+				{
+					System.out.println("create path: " + schemaoutputdir + " error!");
+					return;
+				}
+			}
+			
 			JCodeModel codeModel = new JCodeModel();
 			JSCodeModel jscodeModel = new CodeModelImpl();
 			Generator gen = new Generator(packagename);
-			
+			ObjectMapper mapper = new ObjectMapper();
 			
 			if (js)
 			{
@@ -185,6 +198,12 @@ public class command {
 					String classname = StringUtils.substringBeforeLast(list[i].getName(), ".");
 					URL url = list[i].toURI().toURL();
 					gen.generate(codeModel, classname, url);
+					FileWriter schemaF = new FileWriter(schemaoutputdir + "/" + classname + ".schema");
+					schemaF.write(mapper.writer().withDefaultPrettyPrinter().writeValueAsString(gen.getCurrentSchema()));
+					//System.out.println(mapper.writer().withDefaultPrettyPrinter().writeValueAsString(gen.getCurrentSchema()));
+					schemaF.flush();
+					schemaF.close();
+					
 					if (js)
 					{
 						gen.jsgenerate(url, jsprefix + ".actions." + classname.toLowerCase());

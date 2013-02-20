@@ -111,6 +111,11 @@ public class Generator {
 	private JSCodeModel jsCodeModel = null;
 	private JSFunctionDeclaration jsActionAnonymous = null;
 	private JSFunctionDeclaration jsClouseAnonymous = null;
+	private JsonNode m_CurrentSchema = null;
+	
+	public JsonNode getCurrentSchema(){
+		return m_CurrentSchema;
+	}
 	
 	public void setJsActionProg(JSProgram prog)
 	{
@@ -303,7 +308,7 @@ public class Generator {
 		JsonNode content = new ObjectMapper().readTree(new File(URI.create(this.url.toString())));
 		JSProgram prog = jsCodeModel.program();
 		
-		JSGlobalVariable jsObject = jsCodeModel.globalVariable("moulde");
+		JSGlobalVariable jsObject = jsCodeModel.globalVariable("module");
 		JSObjectLiteral defineObj = jsCodeModel.object();
 		Function getHeaderFunc = jsCodeModel.function();
 		Function runFunc = jsCodeModel.function();
@@ -921,7 +926,7 @@ public class Generator {
         		
         		((JDefinedClass)type)._extends(jClassContainer.owner().ref("ActionHandler"));
         		schemaField.init(JExpr.lit(node.toString()));
-        		
+        		m_CurrentSchema = node;
         		((JDefinedClass)type).method(JMod.PUBLIC, String.class, "getJsonSchema").body()._return(JExpr.refthis("JSONSCHEMA"));
         		
         		createConstructor((JDefinedClass)type, node);

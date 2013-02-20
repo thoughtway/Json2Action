@@ -38,8 +38,8 @@ IActionHandler ActionHandler必须实现的接口，即必须实现的方法：d
 UnkownAction  当无法找到对应的Action或者提供的请求原始数据里连Action的定义都没有时，调用getAction就会返回这个Action。
 
 3、下一步
-3.1 生成对应的页面Javascript实现代码
-3.2 生成对应的Node.JS的服务器代码
-3.3 在生成Java类中，引入类似代理类的机制，增加扩展性。
-3.4 保存中间生成的Schema到文件
+3.1 生成对应的页面Javascript实现代码（已完成）
+3.2 生成对应的Node.JS的服务器代码（已完成）
+3.3 在生成Java类中，引入类似代理类的机制，增加扩展性。(暂时放弃，应该是项目中问题。)
+3.4 保存中间生成的Schema到文件（已完成）
 3.5 在chrome里做一个浏览器插件，用来定义json并保存文件。
