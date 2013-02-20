@@ -198,7 +198,7 @@ public class Generator {
 		
 		JBlock e_getaction = exceptionAction.method(JMod.PUBLIC, codeModel.ref("ActionBase"), "getAction").body();
 		e_getaction.directStatement("hSource.getAction().setResult(false);");
-		e_getaction.directStatement("hSource.getAction().setMsg(\"缺少必要的参数。\");");
+		e_getaction.directStatement("hSource.getAction().setMsg(\"Request Format Validate Error.\");");
 		e_getaction.directStatement("hSource.getAction().setCode(500);");
 		e_getaction._return(JExpr.direct("(ActionBase)hSource.getAction()"));
 		
@@ -792,7 +792,7 @@ public class Generator {
 		jB.directStatement("this.Action.setName(\"UNKNOWNACTION\");");
 		jB.directStatement("this.Action.setCode(5000);");
 		jB.directStatement("this.Action.setResult(false);");
-		jB.directStatement("this.Action.setMsg(\"未知的Action请求\");");
+		jB.directStatement("this.Action.setMsg(\"Unknown Action Request!\");");
 	}
 	
 	public JType generate(JCodeModel codeModel, String classname, URL url) throws JClassAlreadyExistsException{
