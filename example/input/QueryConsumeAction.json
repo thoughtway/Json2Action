@@ -1,0 +1,24 @@
+{
+	"Action":{
+		"Name": "ACTION_CODE_QUERYCONSUME",
+		"Code": -1,
+		"Result": true,
+		"Flag": 0,
+		"SessionID": "",
+		"Msg": ""
+	},
+	"Parameter":{
+		"StartIndex": 0,
+		"Count": 50,
+		"Filters":[{
+			"OrderID": ""
+		}]
+	},
+	"Response":{
+		"Total": 0,
+		"FeeTotal": 0,
+		"FeeSubTotal": 0,
+		"Records":[
+		]
+	}
+}

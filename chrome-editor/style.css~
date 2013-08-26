@@ -1,0 +1,45 @@
+body{
+	background-color:gray;
+}
+
+.catDiv{
+	font-size:20px;
+	font-weight:bold;
+	text-shadow: 1px 2px 3px rgba(0,0,0,0.5); 
+	float: left;
+	display: inline-block;
+}
+
+.LeftList{
+	font-size: 20px;
+	font-weight: bold;
+	text-shadow: 1px 2px 3px rgba(0,0,0,0.5);
+	float: left;
+	display: inline-block;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.LeftList li{
+	height: 25px;
+	width: 40%;
+	padding: 2px;
+}
+
+.LeftList li div{
+	border: 1px solid black;
+	padding: 4px;
+}
+
+.LeftPanel{
+	float: left;
+	display:inline-block;
+	border: 1px solid black;
+	height: 98%;
+	width: 12%;
+}
+
+.EditPanel{
+	width: 87%;
+}

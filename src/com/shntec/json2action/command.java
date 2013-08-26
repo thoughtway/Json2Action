@@ -206,7 +206,7 @@ public class command {
 					
 					if (js)
 					{
-						gen.jsgenerate(url, jsprefix + ".actions." + classname.toLowerCase());
+						gen.jsgenerate(url, jsprefix + "."+ classname.toLowerCase());
 					}
 					
 					ObjectMapper objmapper = new ObjectMapper();

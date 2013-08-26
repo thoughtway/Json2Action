@@ -1,0 +1,19 @@
+{
+	"Action":{
+		"Name": "ACTION_CODE_QUERYMERCHANT",
+		"Code": -1,
+		"Result": true,
+		"Flag": 0,
+		"SessionID": "",
+		"Msg": ""
+	},
+	"Parameter":{
+		"Keyword": ""	
+	},
+	"Response":{
+		"Merchants":[{
+			"ID": 0,
+			"Merchant": ""
+		}]
+	}
+}

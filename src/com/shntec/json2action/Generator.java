@@ -387,6 +387,10 @@ public class Generator {
 		
 		constructor.getBody().expression(jsCodeModel._this().p("ActionName").assign(jsCodeModel.string(content.get("Action").get("Name").asText())));
 		constructor.getBody().expression(jsCodeModel._this().p("ActionCode").assign(jsCodeModel.string(content.get("Action").get("Code").asText())));
+		if (content.get("Action").has("NeedCheck"))
+		{
+			constructor.getBody().expression(jsCodeModel._this().p("NeedCheck").assign(jsCodeModel.integer(content.get("Action").get("NeedCheck").asLong())));
+		}		
 		
 		if (content.has("Response"))
 		{
@@ -415,7 +419,7 @@ public class Generator {
 				}
 				else
 				{
-					po.append(key, constructor_param.p(key).i("slice").args(jsCodeModel.integer(0)));
+					po.append(key, constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0)));
 					Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0))));
 				}
 			}
