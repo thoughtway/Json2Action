@@ -2,8 +2,10 @@ package com.shntec.json2action;
 
 import static org.apache.commons.lang.StringUtils.*;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Arrays;
@@ -12,6 +14,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.*;
@@ -68,6 +72,52 @@ public class command {
 	 * @throws NoSuchFieldException 
 	 * @throws SecurityException 
 	 */
+	public static void fixJSBug(String fn, String prefix) throws IOException{
+		FileReader reader;
+		FileWriter writer;
+		BufferedReader bufread;
+		String read, content = "";
+		
+		reader = new FileReader(fn);
+		bufread = new BufferedReader(reader);
+		
+		while ((read = bufread.readLine()) != null) {
+			content = content + read + "\r\n";
+		}
+		
+		String regex = "new ";
+		String[] sArray = prefix.split("\\.");
+
+		for(int i = 0;i < sArray.length; i++)
+		{
+			//System.out.println(sArray[i]);
+			regex += sArray[i] + "\\.";
+		}
+		
+		regex += "(.*);";
+		//String regex = "new " + prefix + "\\.(.*);";
+		Pattern pattern = Pattern.compile(regex);
+		
+		Matcher matcher = pattern.matcher(content);
+		StringBuffer sb = new StringBuffer();
+		while (matcher.find())
+		{
+			//System.out.println(matcher.group(0));
+			//System.out.println(matcher.group(1));
+			matcher.appendReplacement(sb, "new " + prefix + "." + matcher.group(1) + "(opts);");
+			//content.substring(matcher.start(), matcher.end());
+		}
+		
+		 matcher.appendTail(sb);
+		 //System.out.println(content);
+		 
+		 //Write
+		 writer = new FileWriter(fn);
+		 writer.write(sb.toString(), 0, sb.length());
+		 writer.flush();
+		 writer.close();
+	}
+	
 	public static void main(String[] args) throws IOException, JClassAlreadyExistsException, SecurityException, NoSuchFieldException {
 		// TODO Auto-generated method stub
 		String ParentPath = new File(command.class.getResource("/").getPath()).getParent();
@@ -234,6 +284,7 @@ public class command {
 						fw2 = new FileWriter(clousejsfile);
 				
 				CodeWriter f1 = new CodeWriter(fw1);
+				
 				f1.openRoundBracket();
 				f1.program(actionsprog);
 				f1.closeRoundBracket();
@@ -252,6 +303,10 @@ public class command {
 				f2.semicolon();			
 				fw2.flush();
 				fw2.close();
+				
+				System.out.println("fix js bug...");
+				fixJSBug(clousejsfile, jsprefix);
+				System.out.println("fixed.");
 			}
 			
 		}

@@ -415,12 +415,12 @@ public class Generator {
 				if (!val.isArray())
 				{
 					po.append(key, constructor_param.p(key.toLowerCase()));
-					Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase())));
+					//Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase())));
 				}
 				else
 				{
 					po.append(key, constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0)));
-					Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0))));
+					//Clouse_constructor.getBody().expression(a.p("Parameter").p(key).assign(Clouse_constructor_param.p(key.toLowerCase()).i("slice").args(jsCodeModel.integer(0))));
 				}
 			}
 			
